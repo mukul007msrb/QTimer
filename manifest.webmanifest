@@ -1,6 +1,6 @@
 {
-  "name": "Question Timer",
-  "short_name": "Q Timer",
+  "name": "Tempo",
+  "short_name": "Tempo",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

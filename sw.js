@@ -1,5 +1,5 @@
 // Question Timer: caches the app so it opens with no connection.
-const CACHE = 'qtimer-v2';
+const CACHE = 'tempo-v1';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
