@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#07070a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Q Timer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%2307070a'/%3E%3Ccircle cx='256' cy='282' r='120' fill='none' stroke='%23eef2f5' stroke-width='30'/%3E%3Crect x='228' y='86' width='56' height='40' rx='12' fill='%23eef2f5'/%3E%3Cpath d='M256 282 L312 218' stroke='%235df0b4' stroke-width='30' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>Question Timer · Focus</title>
+<style>
+  :root {
+    --bg: #07070a;
+    --ink: #eef2f5;
+    --dim: #7d838c;
+    --line: #23262c;
+    --good: #5df0b4;
+    --bad: #ff7a4d;
+    --gold: #ffd24a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-rounded, "SF Pro Display", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+  }
+  #stage { position: fixed; inset: 0; display: grid; place-items: center; }
+  .digits {
+    grid-area: 1 / 1;
+    font-size: min(30vw, 52vh);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-shadow: 0 0 60px rgba(238, 242, 245, .12);
+    pointer-events: none;
+  }
+  .digits.long { font-size: min(22vw, 44vh); }
+  .digits.float { font-size: min(19vw, 27vh); }
+  .digits.float.long { font-size: min(14vw, 22vh); }
+  .ring {
+    position: fixed; left: 50%; top: 50%;
+    width: 30vmin; height: 30vmin;
+    border: 4px solid #fff; border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  .float { z-index: 2; will-change: transform, opacity, filter; }
+  .float.good { color: var(--good); text-shadow: 0 0 70px rgba(93, 240, 180, .45); }
+  .float.bad  { color: var(--bad);  text-shadow: 0 0 70px rgba(255, 122, 77, .45); }
+  body.paused #time { color: var(--dim); text-shadow: none; animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .45; } }
+
+  .corner {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    font-size: 22px; font-weight: 700; color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  #q { left: calc(env(safe-area-inset-left, 0px) + 22px); }
+  #total { right: calc(env(safe-area-inset-right, 0px) + 22px); }
+
+  #bar {
+    position: fixed;
+    left: calc(env(safe-area-inset-left, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  #hint { flex: 1; text-align: center; font-size: 16px; color: var(--dim); white-space: pre-line; pointer-events: none; }
+  #barL, #barR { min-width: 84px; display: flex; }
+  #barR { justify-content: flex-end; }
+  .link {
+    appearance: none; background: none; border: 0; font: inherit;
+    font-size: 17px; font-weight: 700; color: var(--dim);
+    padding: 14px 10px; white-space: nowrap; cursor: pointer;
+  }
+  .link:active { color: var(--ink); }
+
+  #badge {
+    position: fixed; left: 0; right: 0; bottom: 14vh;
+    text-align: center; font-size: 26px; font-weight: 800; color: var(--gold);
+    text-shadow: 0 0 30px rgba(255, 210, 74, .5);
+    pointer-events: none; opacity: 0;
+  }
+  @media (orientation: landscape) { #badge { bottom: 3vh; font-size: 22px; } }
+
+  #flash {
+    position: fixed; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, var(--c, #fff) 0%, transparent 72%);
+  }
+  #hold { position: fixed; left: 0; bottom: 0; height: 4px; width: 0; background: var(--bad); pointer-events: none; }
+  #hold.go { width: 100%; transition: width 1.2s linear; }
+
+  /* Sheets: settings, summary, sessions */
+  #sheet {
+    position: fixed; inset: 0; z-index: 10; display: none;
+    background: rgba(7, 7, 10, .97);
+    overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) calc(env(safe-area-inset-right, 0px) + 24px)
+             calc(env(safe-area-inset-bottom, 0px) + 24px) calc(env(safe-area-inset-left, 0px) + 24px);
+  }
+  #sheet.open { display: block; }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 30px; font-weight: 800; margin-bottom: 6px; }
+  .sub { font-size: 17px; color: var(--dim); margin-bottom: 22px; min-height: 1.2em; }
+  .sub.good { color: var(--good); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 16px; margin-bottom: 28px; }
+  .stat span { display: block; font-size: 15px; color: var(--dim); margin-bottom: 2px; }
+  .stat b { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat.f b { color: var(--good); }
+  .stat.s b { color: var(--bad); }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .btn {
+    appearance: none; font: inherit; font-size: 18px; font-weight: 700; color: var(--ink);
+    background: transparent; border: 1.5px solid #3a3f47; border-radius: 999px;
+    padding: 14px 24px; cursor: pointer;
+  }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn:active { opacity: .7; }
+  .set { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .set label { font-size: 19px; font-weight: 600; }
+  .set label small { display: block; font-size: 14px; color: var(--dim); font-weight: 400; margin-top: 2px; }
+  .step { display: flex; align-items: center; gap: 6px; }
+  .step button {
+    appearance: none; font: inherit; font-size: 26px; font-weight: 700; color: var(--ink);
+    width: 48px; height: 48px; border-radius: 50%; background: #17191d; border: 0; cursor: pointer;
+  }
+  .step button:active { background: #23262c; }
+  .step output { min-width: 64px; text-align: center; font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .srow { display: flex; justify-content: space-between; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .srow i { font-style: normal; color: var(--dim); font-size: 15px; }
+  .srow b { font-size: 19px; font-weight: 700; }
+  .srow em { font-style: normal; color: var(--good); font-weight: 700; }
+
+  /* settings controls, times list */
+  input { -webkit-user-select: text; user-select: text; }
+  .set { display: block; align-items: initial; padding: 20px 0; }
+  .set label { display: block; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 12px; }
+  .chip {
+    appearance: none; font: inherit; font-size: 17px; font-weight: 700; color: var(--ink);
+    background: #17191d; border: 1.5px solid transparent; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer;
+  }
+  .chip.on { border-color: var(--ink); }
+  .custom { display: flex; align-items: center; gap: 8px; }
+  .custom input {
+    width: 84px; font: inherit; font-size: 24px; font-weight: 800; text-align: center;
+    color: var(--ink); background: #17191d; border: 1.5px solid #3a3f47; border-radius: 14px;
+    padding: 10px 6px; font-variant-numeric: tabular-nums;
+  }
+  .custom span { color: var(--dim); font-size: 17px; margin-right: 8px; }
+  button.srow {
+    appearance: none; background: none; border: 0; border-bottom: 1px solid var(--line);
+    width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  }
+  button.srow:active { background: #101216; }
+  h2 { font-size: 19px; font-weight: 800; margin: 30px 0 4px; }
+  h2 small { display: block; font-size: 14px; font-weight: 400; color: var(--dim); margin-top: 2px; }
+  .trow {
+    display: grid; grid-template-columns: 58px 1fr auto; align-items: baseline;
+    padding: 12px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
+  }
+  .trow i { font-style: normal; color: var(--dim); font-size: 16px; }
+  .trow b { font-size: 24px; font-weight: 800; }
+  .trow u { text-decoration: none; font-size: 13px; color: var(--dim); margin-left: 6px; }
+  .trow em { font-style: normal; color: var(--dim); font-size: 15px; }
+  .trow.f b { color: var(--good); }
+  .trow.s b { color: var(--bad); }
+
+  #pace { top: calc(env(safe-area-inset-top, 0px) + 48px); right: calc(env(safe-area-inset-right, 0px) + 22px); font-size: 17px; }
+  #pace.good { color: var(--good); }
+  #pace.bad { color: var(--bad); }
+  .chart { background: #0d0f12; border-radius: 16px; padding: 14px 14px 12px; margin: 0 0 22px; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart polyline { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .chart circle { fill: var(--ink); }
+  .chart circle.best { fill: var(--good); }
+  .chart text { fill: var(--dim); font-size: 12px; font-family: inherit; }
+  .chartcap { font-size: 14px; color: var(--dim); margin-top: 6px; }
+  .chart rect { fill: #4a505a; }
+  .chart rect.best { fill: var(--good); }
+  .chart rect.worst { fill: var(--bad); }
+  .chart line.tgt { stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .about p { font-size: 17px; line-height: 1.5; color: #c4c9d0; margin: 8px 0; }
+  .about b { color: var(--ink); }
+  .about h2 { margin-top: 26px; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="time" class="digits">0.00</div></div>
+<div id="flash"></div>
+<div id="badge">New fastest</div>
+<div id="q" class="corner">Question 1</div>
+<div id="total" class="corner">0:00</div>
+<div id="pace" class="corner"></div>
+<div id="bar"><div id="barL"></div><div id="hint">Tap to start</div><div id="barR"></div></div>
+<div id="hold"></div>
+<div id="sheet"></div>
+
+<script>
+(function () {
+  var status = 'idle';          // idle | running | paused | done
+  var segStart = 0, acc = 0;
+  var times = [], sum = 0, count = 0;
+  var lastRecord = null, lockUntil = 0, saved = false;
+  var DOUBLE_MS = 300;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var elTime = $('time'), elQ = $('q'), elTotal = $('total'), elHint = $('hint');
+  var elStage = $('stage'), elFlash = $('flash'), elHold = $('hold'), elSheet = $('sheet');
+  var elBarL = $('barL'), elBarR = $('barR'), elPace = $('pace');
+  var wake = null, clearArmed = false;
+
+  // ---------- storage (safe if blocked) ----------
+  function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var settings = load('qt-settings', { target: 0, n: 0 });
+  var sessions = load('qt-sessions', []);
+
+  // ---------- formatting ----------
+  function fmt(ms) {
+    var s = ms / 1000;
+    if (s < 60) return s.toFixed(2);
+    var m = Math.floor(s / 60), r = s - m * 60;
+    return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1);
+  }
+  function fmtTotal(ms) {
+    var t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function fmtTarget(sec) {
+    if (sec < 60) return sec + 's';
+    var m = Math.floor(sec / 60), r = sec % 60;
+    return m + 'm' + (r ? ' ' + r + 's' : '');
+  }
+  function fmtDelta(ms) { return ms < 60000 ? (ms / 1000).toFixed(1) + 's' : fmtTotal(ms); }
+  function current() { return acc + (status === 'running' ? performance.now() - segStart : 0); }
+
+  // ---------- main loop / render ----------
+  function tick() {
+    if (status === 'counting') return;
+    var c = current(), txt = fmt(c);
+    elTime.textContent = txt;
+    elTime.classList.toggle('long', txt.length > 5);
+    elTotal.textContent = fmtTotal(sum + c);
+    if (status === 'running') requestAnimationFrame(tick);
+  }
+  function cfgLine() {
+    var p = [];
+    if (settings.target) p.push('Target ' + fmtTarget(settings.target));
+    if (settings.n) p.push(settings.n + ' questions');
+    if (settings.countdown) p.push('3-2-1 start');
+    return p.join(' · ');
+  }
+  function render() {
+    document.body.classList.toggle('paused', status === 'paused');
+    elQ.textContent = status === 'done' ? 'Done' :
+      'Question ' + (count + 1) + (settings.n ? ' / ' + settings.n : '');
+    var hint = '', L = '', R = '';
+    if (status === 'idle') {
+      hint = 'Tap to start' + (cfgLine() ? '\n' + cfgLine() : '');
+      L = '<button class="link" data-act="settings">Settings</button>';
+      R = '<button class="link" data-act="sessions">Sessions</button>';
+    } else if (status === 'paused') {
+      hint = 'Paused\ntap to resume · hold to reset';
+      L = '<button class="link" data-act="finish">Finish</button>';
+    }
+    elHint.textContent = hint; elBarL.innerHTML = L; elBarR.innerHTML = R;
+    var pc = '', pcls = '';
+    if (settings.target && count >= 1 && (status === 'running' || status === 'paused')) {
+      var delta = settings.target * 1000 * count - sum;
+      if (Math.abs(delta) < 50) pc = 'on pace';
+      else { pc = fmtDelta(Math.abs(delta)) + (delta > 0 ? ' ahead' : ' behind'); pcls = delta > 0 ? 'good' : 'bad'; }
+    }
+    elPace.textContent = pc; elPace.className = 'corner' + (pcls ? ' ' + pcls : '');
+    tick();
+  }
+
+  function keepAwake() {
+    try {
+      if ('wakeLock' in navigator && !wake) {
+        navigator.wakeLock.request('screen').then(function (w) {
+          wake = w; w.addEventListener('release', function () { wake = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function release() { try { if (wake) { wake.release(); wake = null; } } catch (e) {} }
+
+  // ---------- feedback animation ----------
+  function feedback(t, prevAvg, isBest) {
+    var cls = '', color = '#ffffff';
+    if (settings.target) {
+      if (t <= settings.target * 1000) { cls = 'good'; color = '#5df0b4'; }
+      else { cls = 'bad'; color = '#ff7a4d'; }
+    } else if (prevAvg !== null) {
+      if (t < prevAvg * 0.95) { cls = 'good'; color = '#5df0b4'; }
+      else if (t > prevAvg * 1.05) { cls = 'bad'; color = '#ff7a4d'; }
+    }
+    if (isBest) color = '#ffd24a';
+
+    var f = document.createElement('div');
+    f.className = 'digits float ' + cls;
+    f.textContent = fmt(t);
+    if (fmt(t).length > 5) f.classList.add('long');
+    elStage.appendChild(f);
+    var F = parseFloat(getComputedStyle(elTime).fontSize) || 100;
+    var F2 = parseFloat(getComputedStyle(f).fontSize) || 60;
+    var s0 = F / F2, off = -(0.42 * F + 0.55 * F2);
+    var a = f.animate(reduce
+      ? [{ opacity: 1, transform: 'translateY(' + off + 'px)' }, { opacity: 0, transform: 'translateY(' + off + 'px)' }]
+      : [
+          { opacity: 1, transform: 'translateY(0px) scale(' + s0 + ')', filter: 'blur(0px)', offset: 0 },
+          { opacity: 1, transform: 'translateY(0px) scale(' + (s0 * 1.05) + ')', filter: 'blur(0px)', offset: 0.08, easing: 'cubic-bezier(.2,.9,.3,1)' },
+          { opacity: 1, transform: 'translateY(' + off + 'px) scale(1)', filter: 'blur(0px)', offset: 0.26 },
+          { opacity: 1, transform: 'translateY(' + (off - 8) + 'px) scale(1)', filter: 'blur(0px)', offset: 0.72 },
+          { opacity: 0, transform: 'translateY(' + (off - 70) + 'px) scale(.85)', filter: 'blur(10px)', offset: 1 }
+        ],
+      { duration: reduce ? 1200 : 3200, easing: 'linear', fill: 'forwards' });
+    a.onfinish = function () { f.remove(); };
+
+    elFlash.style.setProperty('--c', color);
+    elFlash.animate([{ opacity: reduce ? 0 : (isBest ? 0.7 : 0.55) }, { opacity: 0 }], { duration: 900, easing: 'ease-out' });
+    if (!reduce) {
+      var rings = isBest ? 2 : 1;
+      for (var i = 0; i < rings; i++) (function (delay) {
+        var ring = document.createElement('div');
+        ring.className = 'ring';
+        ring.style.borderColor = color;
+        document.body.appendChild(ring);
+        var r = ring.animate([
+          { transform: 'translate(-50%, -50%) scale(0.2)', opacity: 0.9 },
+          { transform: 'translate(-50%, -50%) scale(8)', opacity: 0 }
+        ], { duration: 1100, delay: delay, easing: 'cubic-bezier(.1,.6,.3,1)', fill: 'backwards' });
+        r.onfinish = function () { ring.remove(); };
+      })(i * 160);
+      elStage.animate([
+        { transform: 'translate(0, 0)' }, { transform: 'translate(-10px, 6px)' },
+        { transform: 'translate(9px, -7px)' }, { transform: 'translate(-5px, 4px)' },
+        { transform: 'translate(0, 0)' }
+      ], { duration: 340, easing: 'ease-out' });
+    }
+    if (!reduce) elTime.animate(
+      [{ transform: 'scale(.7)', opacity: 0.3 }, { transform: 'scale(1)', opacity: 1 }],
+      { duration: 380, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+
+    var badge = null;
+    if (isBest) {
+      badge = $('badge');
+      badge.animate([
+        { opacity: 0, transform: 'scale(.7)' },
+        { opacity: 1, transform: 'scale(1.08)', offset: 0.1 },
+        { opacity: 1, transform: 'scale(1)', offset: 0.7 },
+        { opacity: 0, transform: 'scale(1)' }
+      ], { duration: reduce ? 1200 : 3000 });
+    }
+    return { el: f, badge: badge };
+  }
+
+  // ---------- core actions ----------
+  function onTap() {
+    var now = performance.now();
+    if (status === 'idle') {
+      if (settings.countdown) { startCountdown(); return; }
+      status = 'running'; acc = 0; segStart = now; lockUntil = now + DOUBLE_MS; lastRecord = null;
+      keepAwake();
+    } else if (status === 'running') {
+      if (now < lockUntil) return;
+      if (lastRecord && now - lastRecord.at < DOUBLE_MS) {
+        // double tap: undo the record, carry on that question, pause
+        sum -= lastRecord.t; count--; times.pop();
+        if (lastRecord.el) lastRecord.el.remove();
+        if (lastRecord.badge) lastRecord.badge.getAnimations().forEach(function (an) { an.cancel(); });
+        acc = lastRecord.t + (now - lastRecord.at);
+        lastRecord = null;
+        status = 'paused'; release();
+      } else {
+        var t = acc + now - segStart;
+        var prevAvg = count ? sum / count : null;
+        var isBest = count >= 1 && t < Math.min.apply(null, times);
+        var fb = feedback(t, prevAvg, isBest);
+        sum += t; count++; times.push(t);
+        acc = 0; segStart = now;
+        lastRecord = { t: t, at: now, el: fb.el, badge: fb.badge };
+        if (settings.n && count >= settings.n) {
+          status = 'done'; release(); lastRecord = null;
+          render();
+          setTimeout(function () { if (status === 'done') showSummary(); }, reduce ? 1400 : 3000);
+          return;
+        }
+      }
+    }
+    render();
+  }
+  function startCountdown() {
+    status = 'counting'; acc = 0; lastRecord = null; keepAwake();
+    render();
+    var n = 3;
+    function step() {
+      if (status !== 'counting') return;
+      if (n === 0) {
+        var now = performance.now();
+        status = 'running'; segStart = now; lockUntil = now + DOUBLE_MS;
+        elFlash.style.setProperty('--c', '#ffffff');
+        if (!reduce) elFlash.animate([{ opacity: 0.3 }, { opacity: 0 }], { duration: 600, easing: 'ease-out' });
+        render();
+        return;
+      }
+      elTime.textContent = n; elTime.classList.remove('long');
+      elTime.animate(reduce
+        ? [{ opacity: 0.2 }, { opacity: 1 }]
+        : [{ transform: 'scale(1.6)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: 0.25 }, { transform: 'scale(.9)', opacity: 0.3 }],
+        { duration: 950, easing: 'ease-out' });
+      n--; setTimeout(step, 1000);
+    }
+    step();
+  }
+  function resume() {
+    var now = performance.now();
+    status = 'running'; segStart = now; lockUntil = now + DOUBLE_MS; lastRecord = null;
+    keepAwake(); render();
+  }
+  function resetAll() {
+    status = 'idle'; acc = 0; sum = 0; count = 0; times = []; lastRecord = null; saved = false; release();
+    render();
+  }
+  function finish() {
+    if (!count) { resetAll(); return; }
+    status = 'done'; release(); render(); showSummary();
+  }
+
+  // ---------- sheets ----------
+  function openSheet(html) { elSheet.innerHTML = '<div class="wrap">' + html + '</div>'; elSheet.classList.add('open'); elSheet.scrollTop = 0; }
+  function closeSheet() { elSheet.classList.remove('open'); elSheet.innerHTML = ''; clearArmed = false; }
+
+  function showAbout() {
+    var fromFile = !/^https?:$/.test(location.protocol);
+    openSheet('<div class="about">' +
+      '<h1>About</h1><div class="sub">A distraction-free timer for practising maths questions.</div>' +
+      '<h2>The basics</h2>' +
+      '<p>Tap <b>anywhere</b> to start question 1. Each time you finish a question, tap again: its time is recorded and the next question starts instantly. The big number is the current question’s time. Top left shows the question number, top right the total time.</p>' +
+      '<h2>After each question</h2>' +
+      '<p>Your finished time floats above the timer for a couple of seconds. <b>Green</b> means you beat your target (or, with no target, you were clearly faster than your running average). <b>Orange</b> means slower. <b>Gold</b> with “New fastest” means your quickest of the session so far, from question 2 on.</p>' +
+      '<h2>Pause, finish and reset</h2>' +
+      '<p><b>Double-tap quickly</b> to pause. The accidental record is undone and that question keeps its time. While paused: tap to resume, <b>hold</b> your finger down for about a second to reset everything, or tap <b>Finish</b> (bottom left) to end the session and see the summary. The question you were on when you paused is not counted.</p>' +
+      '<h2>Settings</h2>' +
+      '<p><b>Target time</b>: pick a preset or type minutes and seconds, any length up to 2 hours. <b>Questions</b>: the session ends by itself after that many, or choose Off to keep going until you tap Finish. <b>3-2-1 start</b>: an optional countdown before question 1. Settings apply to your next session and are remembered.</p>' +
+      '<h2>Pace</h2>' +
+      '<p>With a target set, the top right shows how far ahead or behind you are, compared with the target multiplied by the questions you have finished. It appears from question 2 on.</p>' +
+      '<h2>Summary and sessions</h2>' +
+      '<p>When a session ends you see the number of questions, total time, average, fastest, slowest and how many hit your target, then a bar chart of every question and the full list in order with a running total. <b>Sessions</b> (bottom right on the start screen) keeps your last 60 sessions with a chart of your average over time. Tap any session to see all its times.</p>' +
+      '<h2>Rotating and screen</h2>' +
+      '<p>Works in portrait and landscape, and keeps the screen awake while a session is running on browsers that allow it.</p>' +
+      '<h2>Your data</h2>' +
+      '<p>Settings and sessions are saved only on this phone, in this browser. Nothing is uploaded. Clearing the browser’s site data, or using a private tab, removes them.</p>' +
+      '<h2>Add to your home screen</h2>' +
+      '<p>Open the app from its <b>web link</b> in Chrome, tap the ⋮ menu, then choose <b>Add to Home screen</b> or <b>Install app</b>. It then opens full screen with no browser bars. On iPhone, use Safari: Share, then <b>Add to Home Screen</b>.</p>' +
+      '<p>Chrome cannot do this for a file opened from your phone’s storage (Files or Downloads); it needs a web link. The downloaded file works fully offline, while the web link needs a connection to load.</p>' +
+      (fromFile ? '<p><b>This copy is running from a file</b>, so Chrome will not offer Add to Home screen here. Use the web link instead.</p>' : '') +
+      '<div class="btns" style="margin-top:22px"><button class="btn primary" data-act="settings-back">Back</button>' +
+      (deferredInstall ? '<button class="btn" data-act="install">Install app</button>' : '') + '</div></div>');
+  }
+  function chip(label, act, v, on) {
+    return '<button class="chip' + (on ? ' on' : '') + '" data-act="' + act + '" data-v="' + v + '">' + label + '</button>';
+  }
+  function showSettings() {
+    var t = settings.target, n = settings.n;
+    var tp = [[0, 'Off'], [10, '10s'], [30, '30s'], [36, '36s'], [60, '1m'], [120, '2m'], [300, '5m']];
+    var np = [[0, 'Off'], [10, '10'], [20, '20'], [25, '25'], [30, '30'], [50, '50']];
+    openSheet(
+      '<h1>Settings</h1><div class="sub">Applies to your next session</div>' +
+      '<div class="set"><label>Target time<small>Green if you beat it, orange if not. Any length, type your own below.</small></label>' +
+        '<div class="chips">' + tp.map(function (p) { return chip(p[1], 'tpreset', p[0], t === p[0]); }).join('') + '</div>' +
+        '<div class="custom"><input id="tmin" type="number" inputmode="numeric" min="0" max="120" value="' + Math.floor(t / 60) + '"><span>min</span>' +
+        '<input id="tsec" type="number" inputmode="numeric" min="0" max="59" value="' + (t % 60) + '"><span>sec</span></div></div>' +
+      '<div class="set"><label>Questions<small>Session ends automatically</small></label>' +
+        '<div class="chips">' + np.map(function (p) { return chip(p[1], 'npreset', p[0], n === p[0]); }).join('') + '</div>' +
+        '<div class="custom"><input id="nin" type="number" inputmode="numeric" min="0" max="500" value="' + n + '"><span>questions</span></div></div>' +
+      '<div class="set"><label>3-2-1 start<small>Counts down before the first question</small></label>' +
+        '<div class="chips">' + chip('Off', 'cdpreset', 0, !settings.countdown) + chip('On', 'cdpreset', 1, !!settings.countdown) + '</div></div>' +
+      '<div class="btns" style="margin-top:28px"><button class="btn primary" data-act="close">Done</button>' +
+      '<button class="btn" data-act="about">About &amp; how to use</button></div>');
+  }
+  function syncSettingsUI() {
+    var cs = elSheet.querySelectorAll('.chip');
+    for (var i = 0; i < cs.length; i++) {
+      var v = +cs[i].getAttribute('data-v');
+      var act = cs[i].getAttribute('data-act');
+      cs[i].classList.toggle('on', act === 'tpreset' ? v === settings.target : act === 'npreset' ? v === settings.n : (v === 1) === !!settings.countdown);
+    }
+    var tm = $('tmin'), ts = $('tsec'), ni = $('nin');
+    if (tm) tm.value = Math.floor(settings.target / 60);
+    if (ts) ts.value = settings.target % 60;
+    if (ni) ni.value = settings.n;
+  }
+
+  function statsHTML(s) {
+    var hasHits = s.hits !== null && s.hits !== undefined;
+    return '<div class="grid">' +
+      '<div class="stat"><span>Questions</span><b>' + s.n + '</b></div>' +
+      '<div class="stat"><span>Total time</span><b>' + fmtTotal(s.total) + '</b></div>' +
+      '<div class="stat"><span>Average</span><b>' + fmt(s.avg) + '</b></div>' +
+      (hasHits ? '<div class="stat"><span>Hit target</span><b>' + s.hits + '/' + s.n + '</b></div>' : '<div class="stat"></div>') +
+      '<div class="stat f"><span>Fastest</span><b>' + fmt(s.min) + '</b></div>' +
+      '<div class="stat s"><span>Slowest</span><b>' + fmt(s.max) + '</b></div>' +
+      '</div>';
+  }
+  function questionChartHTML(ts, tgt) {
+    if (!ts || ts.length < 2) return '';
+    var W = 320, H = 140, pl = 10, pr = 10, pt = 22, pb = 22;
+    var mn = Math.min.apply(null, ts), mx = Math.max.apply(null, ts);
+    var top = Math.max(mx, tgt ? tgt * 1000 : 0) * 1.08;
+    var n = ts.length, slot = (W - pl - pr) / n, bw = Math.min(28, slot * 0.7);
+    var bars = ts.map(function (v, i) {
+      var h = (H - pt - pb) * v / top, x = pl + slot * i + (slot - bw) / 2, y = H - pb - h;
+      var cls = mn === mx ? '' : v === mn ? ' class="best"' : v === mx ? ' class="worst"' : '';
+      return '<rect' + cls + ' x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, bw / 2).toFixed(1) + '"/>';
+    }).join('');
+    var tl = '';
+    if (tgt) {
+      var ty = H - pb - (H - pt - pb) * tgt * 1000 / top;
+      tl = '<line class="tgt" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + ty.toFixed(1) + '" y2="' + ty.toFixed(1) + '"/>' +
+           '<text x="' + (W - pr) + '" y="' + (ty - 5).toFixed(1) + '" text-anchor="end">target ' + fmtTarget(tgt) + '</text>';
+    }
+    return '<div class="chart" style="margin-top:26px"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Time per question">' +
+      bars + tl + '<text x="' + pl + '" y="' + (H - 6) + '">Q1</text><text x="' + (W - pr) + '" y="' + (H - 6) + '" text-anchor="end">Q' + n + '</text>' +
+      '</svg><div class="chartcap">Time per question, in order. Green is fastest, orange is slowest.</div></div>';
+  }
+  function listHTML(ts, tgt) {
+    if (!ts || !ts.length) return '<div class="sub" style="margin-top:20px">Individual times were not saved for this session.</div>';
+    var mn = Math.min.apply(null, ts), mx = Math.max.apply(null, ts), cum = 0, rows = '';
+    for (var i = 0; i < ts.length; i++) {
+      cum += ts[i];
+      var cls = ts.length > 1 ? (ts[i] === mn ? ' f' : ts[i] === mx ? ' s' : '') : '';
+      var tag = cls === ' f' ? ' <u>fastest</u>' : cls === ' s' ? ' <u>slowest</u>' : '';
+      rows += '<div class="trow' + cls + '"><i>Q' + (i + 1) + '</i><span><b>' + fmt(ts[i]) + '</b>' + tag + '</span><em>' + fmtTotal(cum) + '</em></div>';
+    }
+    return questionChartHTML(ts, tgt) + '<h2>All questions in order <small>running total on the right</small></h2>' + rows;
+  }
+
+  function showSummary() {
+    if (!count) { closeSheet(); resetAll(); return; }
+    var avg = sum / count, mn = Math.min.apply(null, times), mx = Math.max.apply(null, times);
+    var hits = settings.target ? times.filter(function (x) { return x <= settings.target * 1000; }).length : null;
+    var priorBest = null;
+    sessions.forEach(function (x) { if (x.n >= 3 && (priorBest === null || x.avg < priorBest)) priorBest = x.avg; });
+    var note = '', good = false;
+    if (count >= 3 && priorBest !== null && !saved) {
+      if (avg < priorBest) { note = 'Best average yet'; good = true; }
+      else note = '+' + ((avg - priorBest) / 1000).toFixed(2) + 's vs your best average';
+    }
+    var rec = { d: Date.now(), n: count, total: sum, avg: avg, min: mn, max: mx, tgt: settings.target, hits: hits,
+                times: times.map(function (x) { return Math.round(x); }) };
+    if (!saved) {
+      sessions.unshift(rec); sessions = sessions.slice(0, 60); store('qt-sessions', sessions); saved = true;
+    }
+    openSheet(
+      '<h1>Session complete</h1><div class="sub' + (good ? ' good' : '') + '">' + (note || '&nbsp;') + '</div>' +
+      statsHTML(rec) +
+      '<div class="btns"><button class="btn primary" data-act="new">New session</button>' +
+      '<button class="btn" data-act="sessions-new">Sessions</button></div>' +
+      listHTML(rec.times, rec.tgt));
+  }
+
+  function showDetail(i) {
+    var x = sessions[i]; if (!x) { showSessions(); return; }
+    var when = new Date(x.d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    openSheet(
+      '<h1>Session</h1><div class="sub">' + when + (x.tgt ? ' · target ' + fmtTarget(x.tgt) : '') + '</div>' +
+      statsHTML(x) +
+      '<div class="btns"><button class="btn primary" data-act="sessions">Back</button></div>' +
+      listHTML(x.times, x.tgt));
+  }
+
+  function chartHTML() {
+    if (sessions.length < 2) return '';
+    var d = sessions.slice(0, 20).map(function (x) { return x.avg; }).reverse();
+    var W = 320, H = 130, pl = 10, pr = 10, pt = 24, pb = 14;
+    var mn = Math.min.apply(null, d), mx = Math.max.apply(null, d);
+    if (mx - mn < 1000) { mx += 500; mn = Math.max(0, mn - 500); }
+    var lab = function (ms) { return ms < 60000 ? (ms / 1000).toFixed(1) + 's' : fmtTotal(ms); };
+    var pts = d.map(function (v, i) {
+      return [pl + (W - pl - pr) * (i / (d.length - 1)), pt + (H - pt - pb) * (mx - v) / (mx - mn)];
+    });
+    var dots = pts.map(function (q, i) {
+      var last = i === pts.length - 1;
+      return '<circle' + (last && d[i] === mn ? ' class="best"' : '') + ' cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="' + (last ? 5.5 : 3.5) + '"/>';
+    }).join('');
+    return '<div class="chart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Average time per session">' +
+      '<text x="' + pl + '" y="14">' + lab(mx) + '</text><text x="' + pl + '" y="' + (H - 1) + '">' + lab(mn) + '</text>' +
+      '<polyline points="' + pts.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '"/>' + dots +
+      '</svg><div class="chartcap">Average time per session, oldest to newest. Lower is faster.</div></div>';
+  }
+
+  function showSessions() {
+    var rows = sessions.map(function (x, i) {
+      var d = new Date(x.d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return '<button class="srow" data-act="open" data-i="' + i + '"><span><b>' + fmt(x.avg) + '</b> <i>avg · ' + x.n + ' q</i></span>' +
+        '<span><i>best ' + fmt(x.min) + ' · ' + d + ' ›</i></span></button>';
+    }).join('');
+    openSheet(
+      '<h1>Sessions</h1><div class="sub">' + (sessions.length ? 'Tap a session to see every time' : 'Finish a session and it will appear here') + '</div>' +
+      chartHTML() + rows +
+      '<div class="btns" style="margin-top:26px"><button class="btn primary" data-act="close">Close</button>' +
+      (sessions.length ? '<button class="btn" data-act="clear">' + (clearArmed ? 'Tap again to clear' : 'Clear all') + '</button>' : '') + '</div>');
+  }
+
+  elSheet.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var a = b.getAttribute('data-act');
+    if (a === 'tpreset') { settings.target = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'cdpreset') { settings.countdown = b.getAttribute('data-v') === '1'; store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'npreset') { settings.n = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'about') showAbout();
+    else if (a === 'settings-back') showSettings();
+    else if (a === 'install') { if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; showAbout(); } }
+    else if (a === 'close') { closeSheet(); render(); }
+    else if (a === 'new') { closeSheet(); resetAll(); }
+    else if (a === 'sessions-new') { resetAll(); showSessions(); }
+    else if (a === 'sessions') showSessions();
+    else if (a === 'open') showDetail(+b.getAttribute('data-i'));
+    else if (a === 'clear') {
+      if (!clearArmed) { clearArmed = true; showSessions(); }
+      else { sessions = []; store('qt-sessions', sessions); clearArmed = false; showSessions(); }
+    }
+  });
+  elSheet.addEventListener('change', function (e) {
+    var id = e.target.id;
+    if (id === 'tmin' || id === 'tsec') {
+      var m = parseInt($('tmin').value, 10) || 0, sec = parseInt($('tsec').value, 10) || 0;
+      settings.target = Math.max(0, Math.min(7200, m * 60 + sec));
+    } else if (id === 'nin') {
+      settings.n = Math.max(0, Math.min(500, parseInt(e.target.value, 10) || 0));
+    } else return;
+    store('qt-settings', settings); syncSettingsUI();
+  });
+  $('bar').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var a = b.getAttribute('data-act');
+    if (a === 'settings') showSettings();
+    else if (a === 'sessions') showSessions();
+    else if (a === 'finish') finish();
+  });
+
+  // ---------- input: taps on touch-down; paused press can become hold-to-reset ----------
+  var press = null, holdTimer = null;
+  function clearHold() {
+    clearTimeout(holdTimer);
+    elHold.style.transition = 'none';
+    elHold.classList.remove('go');
+    void elHold.offsetWidth;
+    elHold.style.transition = '';
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('button') || e.target.closest('#sheet')) return;
+    e.preventDefault();
+    if (press || status === 'done' || status === 'counting') return;
+    if (status === 'paused') {
+      press = { paused: true, fired: false };
+      elHold.classList.add('go');
+      holdTimer = setTimeout(function () { press.fired = true; clearHold(); resetAll(); }, 1200);
+    } else {
+      press = { paused: false };
+      onTap();
+    }
+  });
+  document.addEventListener('pointerup', function () {
+    if (!press) return;
+    var p = press; press = null;
+    if (p.paused && !p.fired) { clearHold(); resume(); }
+  });
+  document.addEventListener('pointercancel', function () {
+    if (press && press.paused) clearHold();
+    press = null;
+  });
+  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && status === 'running') { tick(); keepAwake(); }
+  });
+
+  // ---------- installable on the home screen (works when served over https) ----------
+  var deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; });
+  window.addEventListener('appinstalled', function () { deferredInstall = null; });
+  function makeIcon(size) {
+    var c = document.createElement('canvas'); c.width = c.height = size;
+    var g = c.getContext('2d'), k = size / 512;
+    g.fillStyle = '#07070a'; g.fillRect(0, 0, size, size);
+    g.strokeStyle = '#eef2f5'; g.lineWidth = 30 * k;
+    g.beginPath(); g.arc(256 * k, 282 * k, 120 * k, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#eef2f5'; g.fillRect(228 * k, 86 * k, 56 * k, 40 * k);
+    g.strokeStyle = '#5df0b4'; g.lineCap = 'round'; g.lineWidth = 30 * k;
+    g.beginPath(); g.moveTo(256 * k, 282 * k); g.lineTo(312 * k, 218 * k); g.stroke();
+    return c.toDataURL('image/png');
+  }
+  function setupPWA() {
+    if (!/^https?:$/.test(location.protocol)) return;
+    if (document.querySelector('link[rel="manifest"]')) {
+      try { if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+      return;
+    }
+    try {
+      var manifest = {
+        name: 'Question Timer', short_name: 'Q Timer',
+        start_url: location.href.split('#')[0], display: 'standalone', orientation: 'any',
+        background_color: '#07070a', theme_color: '#07070a',
+        icons: [
+          { src: makeIcon(192), sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: makeIcon(512), sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+      };
+      var m = document.createElement('link');
+      m.rel = 'manifest';
+      m.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+      document.head.appendChild(m);
+      var a = document.createElement('link');
+      a.rel = 'apple-touch-icon'; a.href = makeIcon(180);
+      document.head.appendChild(a);
+    } catch (e) {}
+  }
+  setupPWA();
+
+  render();
+})();
+</script>
+</body>
+</html>
