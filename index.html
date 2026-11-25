@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07070a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,6 +119,7 @@
     padding: 14px 10px; white-space: nowrap; cursor: pointer;
   }
   .link:active { color: var(--ink); }
+  .link.arm { color: var(--bad); }
 
   #badge {
     position: fixed; left: 0; right: 0; bottom: 14vh;
@@ -132,14 +133,37 @@
     position: fixed; inset: 0; opacity: 0; pointer-events: none;
     background: radial-gradient(circle at 50% 50%, var(--c, #fff) 0%, transparent 72%);
   }
-  #hold { position: fixed; left: 0; bottom: 0; height: 4px; width: 0; background: var(--bad); pointer-events: none; }
-  #hold.go { width: 100%; transition: width 1.2s linear; }
+  #holdring {
+    position: fixed; left: 0; top: 0; width: 116px; height: 116px; margin: -58px 0 0 -58px;
+    z-index: 5; pointer-events: none; opacity: 0; scale: .6;
+    transition: opacity .12s, scale .38s cubic-bezier(.2, 1.5, .4, 1);
+  }
+  #holdring.on { opacity: 1; scale: 1; }
+  #holdring svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); transition: filter .3s; }
+  #holdring .halo { display: block; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent); animation: halo 1s ease-out infinite; }
+  #holdring .halo.b { animation-delay: .5s; }
+  #holdring svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent) 75%, transparent)); }
+  #holdring.hot .halo { border-color: var(--bad); animation-duration: .45s; }
+  #holdring.hot .halo.b { animation-delay: .22s; }
+  #holdring.hot svg { filter: drop-shadow(0 0 13px color-mix(in srgb, var(--bad) 85%, transparent)); }
+  #holdring.hot .arc { stroke: var(--bad); }
+  @keyframes halo { from { transform: scale(.92); opacity: .6; } to { transform: scale(1.65); opacity: 0; } }
+  #holdburst {
+    position: fixed; left: 0; top: 0; width: 116px; height: 116px; margin: -58px 0 0 -58px;
+    border-radius: 50%; border: 6px solid var(--bad); z-index: 30; pointer-events: none; opacity: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #holdring { scale: 1; transition: opacity .12s; }
+    #holdring .halo { display: none !important; }
+  }
+  #holdring .track { fill: color-mix(in srgb, var(--bg) 72%, transparent); stroke: var(--border); stroke-width: 6; }
+  #holdring .arc { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; }
 
   /* Sheets: settings, summary, sessions */
   #sheet {
     position: fixed; inset: 0; z-index: 10; display: none;
     background: var(--sheet);
-    overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+    overflow-y: auto; touch-action: pan-y pinch-zoom; -webkit-overflow-scrolling: touch;
     padding: calc(env(safe-area-inset-top, 0px) + 24px) calc(env(safe-area-inset-right, 0px) + 24px)
              calc(env(safe-area-inset-bottom, 0px) + 24px) calc(env(safe-area-inset-left, 0px) + 24px);
   }
@@ -202,7 +226,7 @@
   h2 { font-size: 19px; font-weight: 800; margin: 30px 0 4px; }
   h2 small { display: block; font-size: 14px; font-weight: 400; color: var(--dim); margin-top: 2px; }
   .trow {
-    display: grid; grid-template-columns: 58px 1fr auto; align-items: baseline;
+    display: grid; grid-template-columns: 64px 1fr auto auto; align-items: baseline;
     padding: 12px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
   }
   .trow i { font-style: normal; color: var(--dim); font-size: 16px; }
@@ -246,7 +270,7 @@
   }
 
   /* launch menu */
-  .wrap.menu { min-height: calc(100vh - 48px); display: flex; flex-direction: column; justify-content: center; max-width: 420px; text-align: center; }
+  .wrap.menu, .wrap.pop { min-height: calc(100vh - 48px); display: flex; flex-direction: column; justify-content: center; max-width: 420px; text-align: center; }
   .logo svg { width: 84px; height: 84px; margin-bottom: 14px; }
   .mtitle { font-size: 48px; letter-spacing: -0.02em; margin: 0; }
   .msub { margin-bottom: 28px; }
@@ -267,6 +291,14 @@
     .mbtn.primary { padding: 14px; font-size: 19px; }
   }
   .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; border: 1px solid var(--border); }
+  .del {
+    appearance: none; background: none; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--dim); font: inherit; font-size: 14px; padding: 4px 10px; margin-left: 12px; cursor: pointer; align-self: center;
+  }
+  .del:hover { color: var(--ink); }
+  .del.arm { color: var(--bad); border-color: var(--bad); }
+  .btn.arm { color: var(--bad); border-color: var(--bad); }
+  .sub.warn { color: var(--bad); margin-top: -12px; }
 </style>
 </head>
 <body>
@@ -277,32 +309,50 @@
 <div id="total" class="corner">0:00</div>
 <div id="pace" class="corner"></div>
 <div id="bar"><div id="barL"></div><div id="hint">Tap to start</div><div id="barR"></div></div>
-<div id="hold"></div>
+<div id="holdburst"></div><div id="holdring"><i class="halo"></i><i class="halo b"></i><svg viewBox="0 0 116 116" aria-hidden="true"><circle class="track" cx="58" cy="58" r="52"/><circle class="arc" cx="58" cy="58" r="52"/></svg></div>
 <div id="sheet"></div>
 
 <script>
 (function () {
   var status = 'idle';          // idle | running | paused | done
   var segStart = 0, acc = 0;
-  var times = [], sum = 0, count = 0;
+  var times = [], sum = 0, count = 0, startNum = 1;
   var lastRecord = null, lockUntil = 0, saved = false;
   var DOUBLE_MS = 300;
+  var TWO_FINGER_MS = 350;      // second finger must land this soon after the first to count as a two-finger tap
+  var RING_DELAY = 350;         // ring only appears after this, so ordinary taps never flash it
+  var resetArmed = false, resetTimer = null;
+  var savedStamp = 0, deletedInSummary = false, noticeTimer = null;
+  var RESUME_MS = 10 * 60 * 1000;   // how long after finishing a session can still be resumed
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var $ = function (id) { return document.getElementById(id); };
   var elTime = $('time'), elQ = $('q'), elTotal = $('total'), elHint = $('hint');
-  var elStage = $('stage'), elFlash = $('flash'), elHold = $('hold'), elSheet = $('sheet');
+  var elStage = $('stage'), elFlash = $('flash'), elSheet = $('sheet');
   var elBarL = $('barL'), elBarR = $('barR'), elPace = $('pace');
   var wake = null, clearArmed = false;
 
   // ---------- storage (safe if blocked) ----------
   function load(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
-  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
   var settings = load('qt-settings', { target: 0, n: 0 });
   var sessions = load('qt-sessions', []);
   settings.minutes = settings.minutes || 0;
   settings.theme = settings.theme || 'dark';
   settings.accent = settings.accent || 'classic';
+  settings.start = Math.max(1, parseInt(settings.start, 10) || 1);
+  settings.startMode = ['ask', 'continue', 'fixed'].indexOf(settings.startMode) >= 0 ? settings.startMode : 'ask';
+  settings.holdMs = [900, 1200, 1600, 2000].indexOf(+settings.holdMs) >= 0 ? +settings.holdMs : 1200;
+  var SESSION_LIMIT = 300, saveOk = true, droppedOld = false;
+  function nextNumber() {
+    var x = sessions[0];
+    if (!x) return settings.start;
+    if (x.next) return x.next;
+    if (x.times && x.times.length) { var nm = numsOf(x); return nm[nm.length - 1] + 1; }
+    return (x.n || 0) + 1;
+  }
+  function defaultStart() { return (settings.startMode === 'continue' && sessions.length) ? nextNumber() : settings.start; }
+  var pendingStart = defaultStart();
   var endedByTime = false;
 
   // ---------- look: theme and accent ----------
@@ -361,21 +411,27 @@
     if (settings.target) p.push('Target ' + fmtTarget(settings.target));
     if (settings.n) p.push(settings.n + ' questions');
     if (settings.minutes) p.push(settings.minutes + ' min');
+    if (settings.startMode === 'continue') p.push('Continues numbering');
+    else if (settings.startMode === 'fixed' && settings.start !== 1) p.push('From Q' + settings.start);
     if (settings.countdown) p.push('3-2-1 start');
     return p.join(' · ');
   }
   function render() {
     document.body.classList.toggle('paused', status === 'paused');
+    var base = status === 'idle' ? pendingStart : startNum;
     elQ.textContent = status === 'done' ? 'Done' :
-      'Question ' + (count + 1) + (settings.n ? ' / ' + settings.n : '');
+      'Question ' + (base + count) + (settings.n ? (base === 1 ? ' / ' + settings.n : ' · ' + (count + 1) + ' of ' + settings.n) : '');
     var hint = '', L = '', R = '', desk = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     if (status === 'idle') {
       hint = (desk ? 'Click or press Space to start' : 'Tap to start') + (cfgLine() ? '\n' + cfgLine() : '') +
              (desk ? '\nM menu · S settings · H sessions · F full screen' : '');
       L = '<button class="link" data-act="menu">Menu</button>';
     } else if (status === 'paused') {
-      hint = desk ? 'Paused\nSpace or click to resume · E finish · hold or press R twice to reset' : 'Paused\ntap to resume · hold to reset';
+      hint = resetArmed ? (desk ? 'Press R again to reset' : 'Tap Reset again to discard this session')
+        : desk ? 'Paused\nSpace or click to resume · E or hold to finish · R twice to reset'
+        : 'Paused\ntap to resume · hold to finish';
       L = '<button class="link" data-act="finish">Finish</button>';
+      R = '<button class="link' + (resetArmed ? ' arm' : '') + '" data-act="reset">' + (resetArmed ? 'Tap again' : 'Reset') + '</button>';
     }
     elHint.textContent = hint; elBarL.innerHTML = L; elBarR.innerHTML = R;
     var pc = '', pcls = '';
@@ -474,18 +530,14 @@
     var now = performance.now();
     if (status === 'idle') {
       if (settings.countdown) { startCountdown(); return; }
+      startNum = pendingStart;
       status = 'running'; acc = 0; segStart = now; lockUntil = now + DOUBLE_MS; lastRecord = null;
       keepAwake();
     } else if (status === 'running') {
       if (now < lockUntil) return;
       if (lastRecord && now - lastRecord.at < DOUBLE_MS) {
-        // double tap: undo the record, carry on that question, pause
-        sum -= lastRecord.t; count--; times.pop();
-        if (lastRecord.el) lastRecord.el.remove();
-        if (lastRecord.badge) lastRecord.badge.getAnimations().forEach(function (an) { an.cancel(); });
-        acc = lastRecord.t + (now - lastRecord.at);
-        lastRecord = null;
-        status = 'paused'; release();
+        pauseFromLast(now);   // double tap: undo the record, carry on that question, pause
+        return;
       } else {
         var t = acc + now - segStart;
         var prevAvg = count ? sum / count : null;
@@ -494,6 +546,7 @@
         sum += t; count++; times.push(t);
         acc = 0; segStart = now;
         lastRecord = { t: t, at: now, el: fb.el, badge: fb.badge };
+        saveLive();
         if (settings.n && count >= settings.n) {
           status = 'done'; release(); lastRecord = null;
           render();
@@ -504,7 +557,21 @@
     }
     render();
   }
+  // Undo a question that was recorded by mistake (double tap, two-finger tap, or a hold)
+  function undoRecord(r) {
+    sum -= r.t; count--; times.pop();
+    if (r.el) r.el.remove();
+    if (r.badge) r.badge.getAnimations().forEach(function (an) { an.cancel(); });
+  }
+  function pauseFromLast(now) {
+    var r = lastRecord;
+    undoRecord(r);
+    acc = r.t + (now - r.at);
+    lastRecord = null;
+    status = 'paused'; release(); render(); saveLive();
+  }
   function startCountdown() {
+    startNum = pendingStart;
     status = 'counting'; acc = 0; lastRecord = null; keepAwake();
     render();
     var n = 3;
@@ -540,17 +607,75 @@
   }
   function resume() {
     var now = performance.now();
+    disarmReset();
     status = 'running'; segStart = now; lockUntil = now + DOUBLE_MS; lastRecord = null;
     keepAwake(); render();
   }
-  function resetAll() {
-    status = 'idle'; acc = 0; sum = 0; count = 0; times = []; lastRecord = null; saved = false; endedByTime = false; release();
+  function disarmReset() { clearTimeout(resetTimer); resetTimer = null; resetArmed = false; }
+  function tapReset() {           // Reset asks twice: the first press arms it, the second discards the session
+    if (status !== 'paused') return;
+    if (resetArmed) { disarmReset(); resetAll(); return; }
+    resetArmed = true;
+    resetTimer = setTimeout(function () { resetTimer = null; resetArmed = false; render(); }, 2500);
     render();
   }
+  function resetAll() {
+    disarmReset();
+    status = 'idle'; acc = 0; sum = 0; count = 0; times = []; lastRecord = null; saved = false; endedByTime = false; droppedOld = false; saveOk = true; deletedInSummary = false; clearLive(); release();
+    pendingStart = defaultStart();
+    render();
+  }
+  function notice(msg) {
+    elHint.textContent = msg;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(function () { if (status === 'idle') render(); }, 3000);
+  }
   function finish() {
-    if (!count) { resetAll(); return; }
+    if (!count) { resetAll(); notice('Nothing recorded yet, so the session was cancelled'); return; }
+    if (status === 'running') { acc = current(); status = 'paused'; }   // keep the unfinished question's time
     status = 'done'; release(); render(); showSummary();
   }
+  // A manual finish can be taken back: the saved session is removed and you are paused again on the same question
+  function canResume() {
+    return saved && status === 'done' && !endedByTime && !droppedOld && !deletedInSummary &&
+      !(settings.n && count >= settings.n) && sessions.length && sessions[0].d === savedStamp &&
+      Date.now() - sessions[0].d < RESUME_MS;
+  }
+  function resumeSession() {
+    if (!canResume()) { showSessions(); return; }
+    sessions.shift(); store('qt-sessions', sessions);
+    saved = false; droppedOld = false; saveOk = true; lastRecord = null;
+    status = 'paused'; closeSheet(); render(); saveLive();
+  }
+  // In-progress session is kept on this device, so a closed tab or killed browser does not lose it
+  function saveLive() {
+    if (!count || (status !== 'running' && status !== 'paused')) return;
+    store('qt-live', { v: 1, startNum: startNum, times: times.map(Math.round), acc: Math.round(current()) });
+  }
+  function clearLive() { try { localStorage.removeItem('qt-live'); } catch (e) {} }
+  function validLive(l) {
+    return l && typeof l === 'object' && Array.isArray(l.times) && l.times.length >= 1 &&
+      l.times.every(function (v) { return typeof v === 'number' && isFinite(v) && v >= 0; }) &&
+      typeof l.startNum === 'number' && l.startNum >= 1 && typeof l.acc === 'number' && isFinite(l.acc) && l.acc >= 0;
+  }
+  function restoreLive(l) {
+    times = l.times.slice(); count = times.length;
+    sum = times.reduce(function (a, b) { return a + b; }, 0);
+    startNum = l.startNum; acc = l.acc;
+    status = 'paused'; lastRecord = null; saved = false; endedByTime = false; droppedOld = false; saveOk = true; deletedInSummary = false;
+    closeSheet(); render();
+  }
+  function showRestore(l) {
+    var tot = l.times.reduce(function (a, b) { return a + b; }, 0);
+    openSheet('<h1>Pick up where you left off?</h1>' +
+      '<div class="sub msub">You were on Q' + (l.startNum + l.times.length) + ' with ' + l.times.length + (l.times.length === 1 ? ' question' : ' questions') + ' recorded (' + fmtTotal(tot) + ').</div>' +
+      '<button class="mbtn primary" data-act="live-continue">Continue session</button>' +
+      '<button class="mbtn" data-act="live-discard">Discard it</button>' +
+      '<div class="mnote">It comes back paused, so tap when you are ready.</div>', 'pop');
+  }
+  var liveFound = load('qt-live', null);
+  setInterval(function () { if (status === 'running') saveLive(); }, 3000);
+  window.addEventListener('pagehide', saveLive);
 
   // ---------- sheets ----------
   function openSheet(html, cls) { elSheet.innerHTML = '<div class="wrap' + (cls ? ' ' + cls : '') + '">' + html + '</div>'; elSheet.classList.add('open'); elSheet.scrollTop = 0; }
@@ -559,26 +684,22 @@
   function showAbout() {
     var fromFile = !/^https?:$/.test(location.protocol);
     openSheet('<div class="about">' +
-      '<h1>About</h1><div class="sub">A distraction-free timer for practising questions of any kind.</div>' +
-      '<p>Tempo is a small, focused tool for practising questions at speed, in any subject. It does one job: it measures how long each question takes you, and gets out of the way while you work. The whole screen is the button, so there is nothing to aim for and nothing to look at except the number that matters. It was built for drilling sets of questions, where finding out which ones slow you down matters more than the total time.</p>' +
-      '<p>Behind that quiet screen, it keeps track of everything. Every question is timed on its own, compared against a target or against your own average as you go, and gathered into a summary with the fastest, the slowest and the full sequence in order. Past sessions are kept so you can see over days and weeks whether you’re really getting quicker. It’s designed to be dramatic enough to make each finished question feel like a small event, and plain enough never to distract you from the next one.</p>' +
-      '<p>It’s a single self-contained page with no account, no adverts and no tracking. Everything you record is stored only on your own phone, nothing is sent anywhere, and once installed it works with no internet connection at all.</p>' +
+      '<h1>About</h1><div class="sub">A distraction-free timer for practising questions at speed.</div>' +
+      '<p>Tap once per question and Tempo times each one, then shows you which ones slow you down. No account, no adverts, no tracking: everything stays on this device.</p>' +
       '<h2>Getting started</h2>' +
-      '<ul><li>Open the app and tap <b>Start session</b> in the menu. On a computer, press Enter.</li><li>Tap <b>anywhere</b> to start question 1.</li><li>Tap again each time you finish a question. Its time is recorded and the next question starts at once.</li><li>The big number is the current question’s time. Top left shows the question number. Top right shows the total time, or the time left if you set a time limit.</li><li>On the ready screen, tap <b>Menu</b> (bottom left) to go back to the menu. There is no menu during a session.</li></ul>' +
+      '<ul><li>Tap <b>Start session</b> in the menu, then tap <b>anywhere</b> to start question 1.</li><li>Tap each time you finish a question. Its time is recorded and the next one starts at once.</li><li>Big number: this question’s time. Top left: question number. Top right: total time, or time left if you set a limit.</li></ul>' +
       '<h2>After each question</h2>' +
-      '<ul><li>Your finished time floats above the timer for a couple of seconds.</li><li><b>Green</b>: you beat your target, or, with no target, you were clearly faster than your running average.</li><li><b>Orange</b>: slower than your target or average.</li><li><b>Gold</b> with “New fastest”: your quickest of the session so far, from question 2 on.</li></ul>' +
-      '<h2>Pause, finish and reset</h2>' +
-      '<ul><li><b>Double-tap quickly</b> to pause. The accidental record is undone and that question keeps its time.</li><li>While paused, <b>tap</b> to resume.</li><li>While paused, <b>hold</b> your finger down for about a second to reset everything.</li><li>While paused, tap <b>Finish</b> (bottom left) to end the session and see the summary. The question you were on is not counted.</li></ul>' +
+      '<ul><li><b>Green</b>: you beat your target, or were clearly faster than your running average. <b>Orange</b>: slower. <b>Gold</b>, “New fastest”: your quickest so far this session.</li><li>With a target set, a note under the total shows how far ahead or behind you are, from question 2 on.</li></ul>' +
+      '<h2>Pause, finish and reset (touch)</h2>' +
+      '<ul><li><b>Pause</b>: double-tap, or tap with two fingers. The question keeps its time. Tap to resume.</li><li><b>Finish</b>: hold your finger down, mid-question or while paused. A ring fills under it and turns red at the end; lift early to cancel. The question you were on is not counted, so tap it first to include it. While paused you can also tap <b>Finish</b>.</li><li><b>Reset</b>: pause, tap <b>Reset</b>, then tap it again to confirm.</li></ul>' +
+      '<h2>On a computer</h2>' +
+      '<ul><li><b>Space</b>, <b>Enter</b> or a click: start, record a question, or resume when paused.</li><li><b>Pause</b>: <b>P</b> or double-click. <b>Finish</b>: hold the left mouse button until the ring completes, or press <b>E</b>. Mid-question, E pauses first, then press E again. <b>Reset</b>: pause, then press <b>R</b> twice.</li><li>On the ready screen: <b>M</b> menu, <b>S</b> settings, <b>H</b> sessions. In the menu: <b>Enter</b> starts, <b>A</b> opens About.</li><li><b>Esc</b> closes a screen or goes back. <b>F</b> toggles full screen.</li></ul>' +
       '<h2>Settings</h2>' +
-      '<ul><li><b>Target time</b>: pick a preset or type minutes and seconds, up to 2 hours.</li><li><b>Questions</b>: the session ends by itself after that many. Choose Off to carry on until you tap Finish.</li><li><b>Time limit</b>: the session ends when the time runs out, and the top right counts down the time left. The question you are on at that moment is not counted.</li><li>With both a question count and a time limit, whichever comes first ends the session.</li><li><b>3-2-1 start</b>: an optional countdown before question 1.</li><li><b>Theme</b> (dark, light or auto) and <b>Accent colour</b> change how the app looks.</li><li>Changes apply to your next session and are remembered.</li></ul>' +
-      '<h2>Pace</h2>' +
-      '<p>With a target set, a note under the total time shows how far ahead or behind you are, compared with the target multiplied by the questions you have finished. It appears from question 2 on.</p>' +
+      '<ul><li><b>Starting question number</b>: ask each time, carry on from the last session, or use a fixed number.</li><li><b>Target time</b>, <b>Questions</b> and <b>Time limit</b>. The session ends at the question count or when time runs out, whichever comes first. The question you are on at time-out is not counted.</li><li><b>3-2-1 start</b>: optional countdown before question 1.</li><li><b>Hold to finish</b>: how long to hold, from 0.9 to 2 seconds.</li><li><b>Theme</b> and <b>Accent colour</b>. Changes apply to your next session.</li></ul>' +
       '<h2>Summary and sessions</h2>' +
-      '<ul><li>When a session ends you see the number of questions, total time, average, fastest, slowest and how many hit your target.</li><li>Below that are a bar chart of every question and the full list in order, with a running total.</li><li><b>Sessions</b> (from the menu) keeps your last 60 sessions, with a chart of your average over time.</li><li>Tap any session to see all its times.</li></ul>' +
-      '<h2>Keyboard and mouse (computer)</h2>' +
-      '<ul><li><b>Space</b> or <b>Enter</b>: start, and record a question, the same as a click.</li><li><b>P</b>: pause or resume.</li><li>While paused: <b>E</b> finishes, and <b>R</b> pressed twice resets.</li><li>Ready screen: <b>M</b> menu, <b>S</b> settings, <b>H</b> sessions.</li><li><b>F</b>: full screen. <b>Esc</b>: close a screen or go back.</li><li>Mouse: click anywhere, double-click to pause, and hold the button down while paused to reset.</li></ul>' +
+      '<ul><li>The summary shows questions, total, average, fastest, slowest, target hits, a bar chart and every time in order.</li><li><b>Sessions</b> keeps your last 300, with a chart of your average over time. Tap one to see all its times.</li><li><b>Resume session</b>: for ten minutes after you finish by hand, you can go back, paused, to the question you were on. It is on the summary, at the top of Sessions, and on that session’s page, until you start a new session.</li><li>To ignore a question, tap <b>✕</b> beside it, then <b>Delete?</b>. To delete a session, open it, tap <b>Delete session</b>, then tap again.</li></ul>' +
       '<h2>Good to know</h2>' +
-      '<ul><li>Works in portrait and landscape, and keeps the screen awake during a session on browsers that allow it.</li><li>Settings and sessions are saved only on this device, in this browser. Nothing is uploaded. Clearing the browser’s site data, or using a private tab, removes them.</li></ul>' +
+      '<ul><li>If the app closes mid-session, it offers to pick up where you left off, paused.</li><li>Works in portrait and landscape and keeps the screen awake. Menus can be pinch-zoomed.</li><li>Data is saved only in this browser. Clearing site data or using a private tab removes it.</li></ul>' +
       '<h2>Add to your home screen or desktop</h2>' +
       '<ul><li><b>Computer</b> (Chrome or Edge): click the install icon at the right end of the address bar.</li>' +
       '<li><b>Android</b> (Chrome): open the app from its <b>web link</b>, tap the ⋮ menu, then choose <b>Add to Home screen</b> or <b>Install app</b>.</li>' +
@@ -604,6 +725,28 @@
       '<button class="mbtn" data-act="go-about">About</button>' +
       '<div class="mnote">' + (cfg || 'No target or question limit set') + (last ? '<br>' + last : '') + '</div>', 'menu');
   }
+  function startFlow() {
+    if (settings.startMode === 'ask' && sessions.length) { showStartPopup(); return; }
+    pendingStart = defaultStart();
+    closeSheet(); render();
+  }
+  function showStartPopup() {
+    var nxt = nextNumber();
+    openSheet(
+      '<h1>Start from which question?</h1>' +
+      '<div class="sub msub">Your last session ended at Q' + (nxt - 1) + '. Pick where this one starts.</div>' +
+      '<button class="mbtn primary" data-act="sp-continue">Continue from Q' + nxt + '</button>' +
+      '<button class="mbtn" data-act="sp-one">Start again from Q1</button>' +
+      '<div class="set" style="border-bottom:0"><label>Or type a number</label>' +
+        '<div class="custom" style="justify-content:center"><input id="cin" type="number" inputmode="numeric" min="1" max="9999" value="' + nxt + '"><button class="btn primary" data-act="sp-custom">Start</button></div></div>' +
+      '<div class="mnote">You can turn this question off in Settings.</div>' +
+      '<div class="btns" style="margin-top:14px;justify-content:center"><button class="btn" data-act="go-menu">Back</button></div>', 'pop');
+  }
+  function startCustom() {
+    var el = $('cin');
+    pendingStart = Math.max(1, Math.min(9999, parseInt(el && el.value, 10) || 1));
+    closeSheet(); render();
+  }
   function chip(label, act, v, on) {
     return '<button class="chip' + (on ? ' on' : '') + '" data-act="' + act + '" data-v="' + v + '">' + label + '</button>';
   }
@@ -612,7 +755,10 @@
     var tp = [[0, 'Off'], [10, '10s'], [30, '30s'], [36, '36s'], [60, '1m'], [120, '2m'], [300, '5m']];
     var np = [[0, 'Off'], [10, '10'], [20, '20'], [25, '25'], [30, '30'], [50, '50']];
     openSheet(
-      '<h1>Settings</h1><div class="sub">Applies to your next session</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><h1>Settings</h1><button class="btn primary" data-act="close">Done</button></div><div class="sub">Applies to your next session</div>' +
+      '<div class="set"><label>Starting question number<small>When you start a session: ask me, carry on from where the last one ended, or always use the fixed number below</small></label>' +
+        '<div class="chips">' + [['ask', 'Ask each time'], ['continue', 'Continue from last'], ['fixed', 'Fixed number']].map(function (p) { return chip(p[1], 'smpreset', p[0], settings.startMode === p[0]); }).join('') + '</div>' +
+        '<div class="custom"><input id="sin" type="number" inputmode="numeric" min="1" max="9999" value="' + settings.start + '"><span>fixed number</span></div></div>' +
       '<div class="set"><label>Target time<small>Green if you beat it, orange if not. Any length, type your own below.</small></label>' +
         '<div class="chips">' + tp.map(function (p) { return chip(p[1], 'tpreset', p[0], t === p[0]); }).join('') + '</div>' +
         '<div class="custom"><input id="tmin" type="number" inputmode="numeric" min="0" max="120" value="' + Math.floor(t / 60) + '"><span>min</span>' +
@@ -625,6 +771,8 @@
         '<div class="custom"><input id="lin" type="number" inputmode="numeric" min="0" max="480" value="' + settings.minutes + '"><span>minutes</span></div></div>' +
       '<div class="set"><label>3-2-1 start<small>Counts down before the first question</small></label>' +
         '<div class="chips">' + chip('Off', 'cdpreset', 0, !settings.countdown) + chip('On', 'cdpreset', 1, !!settings.countdown) + '</div></div>' +
+      '<div class="set"><label>Hold to finish<small>How long to keep your finger down. A ring fills under your finger, and lifting early cancels.</small></label>' +
+        '<div class="chips">' + [[900, '0.9s'], [1200, '1.2s'], [1600, '1.6s'], [2000, '2s']].map(function (p) { return chip(p[1], 'hlpreset', p[0], settings.holdMs === p[0]); }).join('') + '</div></div>' +
       '<div class="set"><label>Theme<small>Dark, light, or match your device</small></label><div class="chips">' +
         [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Auto']].map(function (p) { return chip(p[1], 'thpreset', p[0], settings.theme === p[0]); }).join('') + '</div></div>' +
       '<div class="set"><label>Accent colour<small>Tints the timer digits and main buttons</small></label><div class="chips">' +
@@ -641,9 +789,12 @@
       else if (act === 'cdpreset') on = (raw === '1') === !!settings.countdown;
       else if (act === 'thpreset') on = raw === settings.theme;
       else if (act === 'acpreset') on = raw === settings.accent;
+      else if (act === 'hlpreset') on = +raw === settings.holdMs;
+      if (act === 'smpreset') on = raw === settings.startMode;
       cs[i].classList.toggle('on', on);
     }
-    var tm = $('tmin'), ts = $('tsec'), ni = $('nin'), li = $('lin');
+    var tm = $('tmin'), ts = $('tsec'), ni = $('nin'), li = $('lin'), si = $('sin');
+    if (si) si.value = settings.start;
     if (tm) tm.value = Math.floor(settings.target / 60);
     if (ts) ts.value = settings.target % 60;
     if (ni) ni.value = settings.n;
@@ -661,7 +812,10 @@
       '<div class="stat s"><span>Slowest</span><b>' + fmt(s.max) + '</b></div>' +
       '</div>';
   }
-  function questionChartHTML(ts, tgt) {
+  function numsOf(x) {
+    return (x.nums && x.nums.length === x.times.length) ? x.nums : x.times.map(function (_, j) { return j + 1; });
+  }
+  function questionChartHTML(ts, tgt, nums) {
     if (!ts || ts.length < 2) return '';
     var W = 320, H = 140, pl = 10, pr = 10, pt = 22, pb = 22;
     var mn = Math.min.apply(null, ts), mx = Math.max.apply(null, ts);
@@ -679,55 +833,117 @@
            '<text x="' + (W - pr) + '" y="' + (ty - 5).toFixed(1) + '" text-anchor="end">target ' + fmtTarget(tgt) + '</text>';
     }
     return '<div class="chart" style="margin-top:26px"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Time per question">' +
-      bars + tl + '<text x="' + pl + '" y="' + (H - 6) + '">Q1</text><text x="' + (W - pr) + '" y="' + (H - 6) + '" text-anchor="end">Q' + n + '</text>' +
+      bars + tl + '<text x="' + pl + '" y="' + (H - 6) + '">Q' + nums[0] + '</text><text x="' + (W - pr) + '" y="' + (H - 6) + '" text-anchor="end">Q' + nums[n - 1] + '</text>' +
       '</svg><div class="chartcap">Time per question, in order. Green is fastest, orange is slowest.</div></div>';
   }
-  function listHTML(ts, tgt) {
+  function listHTML(x, idx, mode) {
+    var ts = x.times, tgt = x.tgt;
     if (!ts || !ts.length) return '<div class="sub" style="margin-top:20px">Individual times were not saved for this session.</div>';
+    var nums = numsOf(x);
     var mn = Math.min.apply(null, ts), mx = Math.max.apply(null, ts), cum = 0, rows = '';
     for (var i = 0; i < ts.length; i++) {
       cum += ts[i];
       var cls = ts.length > 1 ? (ts[i] === mn ? ' f' : ts[i] === mx ? ' s' : '') : '';
       var tag = cls === ' f' ? ' <u>fastest</u>' : cls === ' s' ? ' <u>slowest</u>' : '';
-      rows += '<div class="trow' + cls + '"><i>Q' + (i + 1) + '</i><span><b>' + fmt(ts[i]) + '</b>' + tag + '</span><em>' + fmtTotal(cum) + '</em></div>';
+      rows += '<div class="trow' + cls + '"><i>Q' + nums[i] + '</i><span><b>' + fmt(ts[i]) + '</b>' + tag + '</span><em>' + fmtTotal(cum) + '</em>' +
+        '<button class="del" data-act="del" data-i="' + idx + '" data-k="' + i + '" data-m="' + mode + '" aria-label="Delete question ' + nums[i] + '">✕</button></div>';
     }
-    return questionChartHTML(ts, tgt) + '<h2>All questions in order <small>running total on the right</small></h2>' + rows;
+    return questionChartHTML(ts, tgt, nums) +
+      '<h2>All questions in order <small>Running total on the right. Tap ✕, then Delete?, to remove a question.</small></h2>' + rows;
+  }
+
+  function recompute(x) {
+    var ts = x.times, tot = 0, i;
+    for (i = 0; i < ts.length; i++) tot += ts[i];
+    x.n = ts.length; x.total = tot; x.avg = tot / ts.length;
+    x.min = Math.min.apply(null, ts); x.max = Math.max.apply(null, ts);
+    x.hits = x.tgt ? ts.filter(function (v) { return v <= x.tgt * 1000; }).length : null;
+  }
+
+  var delBtn = null, delTimer = null, delOrig = '';
+  function disarmDel() {
+    clearTimeout(delTimer);
+    if (delBtn) { delBtn.classList.remove('arm'); delBtn.textContent = delOrig; delBtn = null; }
+  }
+  function armBtn(b, label) {
+    disarmDel(); delBtn = b; delOrig = b.textContent;
+    b.classList.add('arm'); b.textContent = label;
+    delTimer = setTimeout(disarmDel, 3000);
+  }
+  function deleteSession(si, mode) {
+    if (!sessions[si]) return;
+    sessions.splice(si, 1); store('qt-sessions', sessions);
+    if (mode === 'summary') { resetAll(); showMenu(); } else showSessions();
+  }
+  function deleteQuestion(si, k, mode) {
+    var x = sessions[si]; if (!x || !x.times) return;
+    if (si === 0) deletedInSummary = true;
+    x.nums = numsOf(x).slice();
+    x.times.splice(k, 1); x.nums.splice(k, 1);
+    if (!x.times.length) {
+      sessions.splice(si, 1); store('qt-sessions', sessions);
+      if (mode === 'summary') { resetAll(); showMenu(); } else showSessions();
+      return;
+    }
+    recompute(x); store('qt-sessions', sessions);
+    renderSession(si, mode, true);
   }
 
   function showSummary() {
     if (!count) { closeSheet(); resetAll(); return; }
     var avg = sum / count, mn = Math.min.apply(null, times), mx = Math.max.apply(null, times);
     var hits = settings.target ? times.filter(function (x) { return x <= settings.target * 1000; }).length : null;
-    var priorBest = null;
-    sessions.forEach(function (x) { if (x.n >= 3 && (priorBest === null || x.avg < priorBest)) priorBest = x.avg; });
-    var note = '', good = false;
-    if (count >= 3 && priorBest !== null && !saved) {
-      if (avg < priorBest) { note = 'Best average yet'; good = true; }
-      else note = '+' + ((avg - priorBest) / 1000).toFixed(2) + 's vs your best average';
-    }
-    if (endedByTime) note = 'Time’s up' + (note ? ' · ' + note : '');
     var rec = { d: Date.now(), n: count, total: sum, avg: avg, min: mn, max: mx, tgt: settings.target, lim: settings.minutes, hits: hits,
-                times: times.map(function (x) { return Math.round(x); }) };
+                byTime: endedByTime, next: startNum + count,
+                times: times.map(function (x) { return Math.round(x); }),
+                nums: times.map(function (_, j) { return startNum + j; }) };
     if (!saved) {
-      sessions.unshift(rec); sessions = sessions.slice(0, 60); store('qt-sessions', sessions); saved = true;
+      sessions.unshift(rec); droppedOld = sessions.length > SESSION_LIMIT; sessions = sessions.slice(0, SESSION_LIMIT);
+      saveOk = store('qt-sessions', sessions); saved = true; savedStamp = rec.d; deletedInSummary = false;
     }
-    openSheet(
-      '<h1>Session complete</h1><div class="sub' + (good ? ' good' : '') + '">' + (note || '&nbsp;') + '</div>' +
-      statsHTML(rec) +
-      '<div class="btns"><button class="btn primary" data-act="new">New session</button>' +
-      '<button class="btn" data-act="menu-new">Menu</button></div>' +
-      listHTML(rec.times, rec.tgt));
+    clearLive();
+    renderSession(0, 'summary');
   }
 
-  function showDetail(i) {
+  function renderSession(i, mode, keepScroll) {
     var x = sessions[i]; if (!x) { showSessions(); return; }
-    var when = new Date(x.d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    openSheet(
-      '<h1>Session</h1><div class="sub">' + when + (x.tgt ? ' · target ' + fmtTarget(x.tgt) : '') + (x.lim ? ' · ' + x.lim + ' min limit' : '') + '</div>' +
-      statsHTML(x) +
-      '<div class="btns"><button class="btn primary" data-act="sessions">Back</button></div>' +
-      listHTML(x.times, x.tgt));
+    var sc = elSheet.scrollTop;
+    if (mode === 'summary') {
+      var priorBest = null;
+      sessions.forEach(function (o, j) { if (j !== i && o.n >= 3 && (priorBest === null || o.avg < priorBest)) priorBest = o.avg; });
+      var note = '', good = false;
+      if (x.n >= 3 && priorBest !== null) {
+        if (x.avg < priorBest) { note = 'Best average yet'; good = true; }
+        else note = '+' + ((x.avg - priorBest) / 1000).toFixed(2) + 's vs your best average';
+      }
+      if (x.byTime) note = 'Time’s up' + (note ? ' · ' + note : '');
+      var warn = '';
+      if (!saveOk) warn = 'Could not save this session: the browser’s storage is full or blocked.';
+      else if (droppedOld) warn = 'Your oldest session was removed to stay within ' + SESSION_LIMIT + '. Delete sessions you do not need.';
+      else if (sessions.length >= Math.floor(SESSION_LIMIT * 0.9)) warn = sessions.length + ' of ' + SESSION_LIMIT + ' sessions saved. The oldest drop off when it is full.';
+      openSheet(
+        '<h1>Session complete</h1><div class="sub' + (good ? ' good' : '') + '">' + (note || '&nbsp;') + '</div>' +
+        (warn ? '<div class="sub warn">' + warn + '</div>' : '') +
+        statsHTML(x) +
+        '<div class="btns"><button class="btn primary" data-act="new">New session</button>' +
+        (canResume() ? '<button class="btn" data-act="resumesess">Resume session</button>' : '') +
+        '<button class="btn" data-act="menu-new">Menu</button>' +
+        '<button class="btn" data-act="delsess" data-i="' + i + '" data-m="summary">Delete session</button></div>' +
+        listHTML(x, i, 'summary'));
+    } else {
+      var when = new Date(x.d).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      openSheet(
+        '<h1>Session</h1><div class="sub">' + when + (x.tgt ? ' · target ' + fmtTarget(x.tgt) : '') + (x.lim ? ' · ' + x.lim + ' min limit' : '') + '</div>' +
+        statsHTML(x) +
+        '<div class="btns"><button class="btn primary" data-act="sessions">Back</button>' +
+        (i === 0 && canResume() ? '<button class="btn" data-act="resumesess">Resume session</button>' : '') +
+        '<button class="btn" data-act="delsess" data-i="' + i + '" data-m="detail">Delete session</button></div>' +
+        listHTML(x, i, 'detail'));
+    }
+    if (keepScroll) elSheet.scrollTop = sc;
   }
+
+  function showDetail(i) { renderSession(i, 'detail'); }
 
   function chartHTML() {
     if (sessions.length < 2) return '';
@@ -757,6 +973,8 @@
     }).join('');
     openSheet(
       '<h1>Sessions</h1><div class="sub">' + (sessions.length ? 'Tap a session to see every time' : 'Finish a session and it will appear here') + '</div>' +
+      (sessions.length >= Math.floor(SESSION_LIMIT * 0.9) ? '<div class="sub warn">' + sessions.length + ' of ' + SESSION_LIMIT + ' sessions saved. When it is full, the oldest drop off. Delete the ones you do not need.</div>' : '') +
+      (canResume() ? '<button class="btn primary" data-act="resumesess" style="margin:4px 0 16px">Resume your last session</button>' : '') +
       chartHTML() + rows +
       '<div class="btns" style="margin-top:26px"><button class="btn primary" data-act="close">Close</button>' +
       (sessions.length ? '<button class="btn" data-act="clear">' + (clearArmed ? 'Tap again to clear' : 'Clear all') + '</button>' : '') + '</div>');
@@ -765,22 +983,40 @@
   elSheet.addEventListener('click', function (e) {
     var b = e.target.closest('[data-act]'); if (!b) return;
     var a = b.getAttribute('data-act');
-    if (a === 'tpreset') { settings.target = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    if (a !== 'del' && a !== 'delsess') disarmDel();
+    if (a === 'del') {
+      if (b.classList.contains('arm')) { disarmDel(); deleteQuestion(+b.getAttribute('data-i'), +b.getAttribute('data-k'), b.getAttribute('data-m')); }
+      else armBtn(b, 'Delete?');
+    }
+    else if (a === 'delsess') {
+      if (b.classList.contains('arm')) { disarmDel(); deleteSession(+b.getAttribute('data-i'), b.getAttribute('data-m')); }
+      else armBtn(b, 'Tap again to delete');
+    }
+    else if (a === 'tpreset') { settings.target = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'smpreset') { settings.startMode = b.getAttribute('data-v'); store('qt-settings', settings); pendingStart = defaultStart(); syncSettingsUI(); }
     else if (a === 'lpreset') { settings.minutes = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
     else if (a === 'thpreset') { settings.theme = b.getAttribute('data-v'); store('qt-settings', settings); applyLook(); syncSettingsUI(); }
     else if (a === 'acpreset') { settings.accent = b.getAttribute('data-v'); store('qt-settings', settings); applyLook(); syncSettingsUI(); }
     else if (a === 'cdpreset') { settings.countdown = b.getAttribute('data-v') === '1'; store('qt-settings', settings); syncSettingsUI(); }
     else if (a === 'npreset') { settings.n = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'hlpreset') { settings.holdMs = +b.getAttribute('data-v'); store('qt-settings', settings); syncSettingsUI(); }
+    else if (a === 'resumesess') resumeSession();
+    else if (a === 'live-continue') { if (validLive(liveFound)) restoreLive(liveFound); else showMenu(); liveFound = null; }
+    else if (a === 'live-discard') { clearLive(); liveFound = null; showMenu(); }
     else if (a === 'about') showAbout();
     else if (a === 'settings-back') showMenu();
     else if (a === 'install') { if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; showAbout(); } }
-    else if (a === 'start') { closeSheet(); render(); }
+    else if (a === 'start') startFlow();
+    else if (a === 'sp-continue') { pendingStart = nextNumber(); closeSheet(); render(); }
+    else if (a === 'sp-one') { pendingStart = 1; closeSheet(); render(); }
+    else if (a === 'sp-custom') startCustom();
+    else if (a === 'go-menu') showMenu();
     else if (a === 'go-settings') showSettings();
     else if (a === 'go-sessions') showSessions();
     else if (a === 'go-about') showAbout();
     else if (a === 'menu-new') { resetAll(); showMenu(); }
     else if (a === 'close') showMenu();
-    else if (a === 'new') { closeSheet(); resetAll(); }
+    else if (a === 'new') { resetAll(); startFlow(); }
     else if (a === 'sessions-new') { resetAll(); showSessions(); }
     else if (a === 'sessions') showSessions();
     else if (a === 'open') showDetail(+b.getAttribute('data-i'));
@@ -794,6 +1030,9 @@
     if (id === 'tmin' || id === 'tsec') {
       var m = parseInt($('tmin').value, 10) || 0, sec = parseInt($('tsec').value, 10) || 0;
       settings.target = Math.max(0, Math.min(7200, m * 60 + sec));
+    } else if (id === 'sin') {
+      settings.start = Math.max(1, Math.min(9999, parseInt(e.target.value, 10) || 1));
+      pendingStart = defaultStart();
     } else if (id === 'lin') {
       settings.minutes = Math.max(0, Math.min(480, parseInt(e.target.value, 10) || 0));
     } else if (id === 'nin') {
@@ -808,45 +1047,108 @@
     else if (a === 'settings') showSettings();
     else if (a === 'sessions') showSessions();
     else if (a === 'finish') finish();
+    else if (a === 'reset') tapReset();
   });
 
-  // ---------- input: taps on touch-down; paused press can become hold-to-reset ----------
-  var press = null, holdTimer = null;
+  // ---------- input ----------
+  // Taps register on touch-down. A press that stays down becomes hold-to-finish, while running or paused:
+  // a ring fills under the finger, and letting go early cancels it.
+  var press = null, ringTimer = null, holdTimer = null;
+  var elRing = $('holdring'), ringArc = elRing.querySelector('.arc');
+  var RING_C = 2 * Math.PI * 52;
+  ringArc.style.strokeDasharray = RING_C;
+  var elBurst = $('holdburst'), hotTimer = null, ringAt = [0, 0];
+  function showRing(x, y, ms) {
+    var m = 62;
+    elRing.className = '';
+    void elRing.offsetWidth;
+    elRing.style.left = Math.max(m, Math.min(window.innerWidth - m, x)) + 'px';
+    elRing.style.top = Math.max(m, Math.min(window.innerHeight - m, y)) + 'px';
+    ringArc.style.transition = 'none';
+    ringArc.style.strokeDashoffset = RING_C;
+    elRing.classList.add('on');
+    void ringArc.getBoundingClientRect();
+    ringArc.style.transition = 'stroke-dashoffset ' + ms + 'ms linear';
+    ringArc.style.strokeDashoffset = 0;
+    ringAt = [parseFloat(elRing.style.left), parseFloat(elRing.style.top)];
+    hotTimer = setTimeout(function () {       // last stretch: the ring turns red and speeds up
+      elRing.classList.add('hot');
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+    }, ms * 0.7);
+  }
+  function burst() {                                              // finish burst, drawn above the summary
+    if (reduce || !elBurst.animate) return;
+    elBurst.style.left = ringAt[0] + 'px'; elBurst.style.top = ringAt[1] + 'px';
+    elBurst.animate([{ opacity: .9, transform: 'scale(.85)' }, { opacity: 0, transform: 'scale(2.8)' }],
+      { duration: 560, easing: 'cubic-bezier(.1,.7,.2,1)' });
+  }
   function clearHold() {
-    clearTimeout(holdTimer);
-    elHold.style.transition = 'none';
-    elHold.classList.remove('go');
-    void elHold.offsetWidth;
-    elHold.style.transition = '';
+    clearTimeout(ringTimer); clearTimeout(holdTimer); clearTimeout(hotTimer);
+    elRing.classList.remove('on'); elRing.classList.remove('hot');
+    ringArc.style.transition = 'none';
+    ringArc.style.strokeDashoffset = RING_C;
+  }
+  function armHold(p) {
+    ringTimer = setTimeout(function () {
+      if (press !== p || p.fired) return;
+      p.ring = true;
+      showRing(p.x, p.y, settings.holdMs - RING_DELAY);
+      elHint.textContent = 'Keep holding to finish';
+    }, RING_DELAY);
+    holdTimer = setTimeout(function () { completeHold(p); }, settings.holdMs);
+  }
+  function completeHold(p) {
+    if (press !== p || p.fired) return;
+    p.fired = true;
+    if (p.ring) burst();
+    clearHold();
+    // the touch-down of this very press may have recorded a question: take it back
+    if (status === 'running' && p.made && lastRecord === p.made) pauseFromLast(performance.now());
+    try { if (navigator.vibrate) navigator.vibrate([20, 30, 50]); } catch (e) {}
+    if (status === 'running' || status === 'paused') finish(); else render();
   }
   document.addEventListener('pointerdown', function (e) {
     if (e.target.closest('button') || e.target.closest('#sheet')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
-    if (press || status === 'done' || status === 'counting') return;
-    if (status === 'paused') {
-      press = { paused: true, fired: false };
-      elHold.classList.add('go');
-      holdTimer = setTimeout(function () { press.fired = true; clearHold(); resetAll(); }, 1200);
-    } else {
-      press = { paused: false };
-      onTap();
+    var now = performance.now();
+    if (press) {
+      // a second finger right after the first: two-finger tap pauses
+      if (e.pointerType === 'touch' && press.type === 'touch' && !press.fired && status === 'running' &&
+          press.made && lastRecord === press.made && now - press.made.at < TWO_FINGER_MS) {
+        clearHold(); press.noResume = true;
+        pauseFromLast(now);
+      }
+      return;
     }
+    if (status === 'done' || status === 'counting') return;
+    var was = status;
+    press = { id: e.pointerId, type: e.pointerType, x: e.clientX, y: e.clientY, paused: was === 'paused', made: null, fired: false, ring: false, noResume: false };
+    if (was !== 'paused') {
+      var before = lastRecord;
+      onTap();
+      if (was === 'running' && lastRecord && lastRecord !== before) press.made = lastRecord;
+    }
+    if (was === 'idle' || (status !== 'running' && status !== 'paused')) return;
+    armHold(press);
   });
-  document.addEventListener('pointerup', function () {
-    if (!press) return;
-    var p = press; press = null;
-    if (p.paused && !p.fired) { clearHold(); resume(); }
+  document.addEventListener('pointerup', function (e) {
+    if (!press || e.pointerId !== press.id) return;
+    var p = press; press = null; clearHold();
+    if (p.fired || p.noResume) return;
+    if (p.ring) { render(); return; }               // hold cancelled: stay exactly as we were
+    if (p.paused && status === 'paused') resume();
   });
-  document.addEventListener('pointercancel', function () {
-    if (press && press.paused) clearHold();
-    press = null;
+  document.addEventListener('pointercancel', function (e) {
+    if (!press || e.pointerId !== press.id) return;
+    var p = press; press = null; clearHold();
+    if (p.ring && !p.fired) render();
   });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   // ---------- keyboard (desktop) ----------
-  var resetKeyTimer = null;
   function pauseNow() {
     if (status !== 'running') return;
-    acc = current(); status = 'paused'; lastRecord = null; release(); render();
+    acc = current(); status = 'paused'; lastRecord = null; release(); render(); saveLive();
   }
   function toggleFullscreen() {
     try {
@@ -857,15 +1159,16 @@
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' && e.target.id === 'cin' && e.key === 'Enter') { startCustom(); return; }
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     var k = e.key;
     if (elSheet.classList.contains('open')) {
       var isMenu = !!elSheet.querySelector('.wrap.menu');
       if (k === 'Escape') {
         if (isMenu) { closeSheet(); render(); }
-        else if (!elSheet.querySelector('[data-act="new"]')) showMenu();
+        else if (!elSheet.querySelector('[data-act="new"]') && !elSheet.querySelector('[data-act="live-continue"]')) showMenu();
       } else if (isMenu && tag !== 'BUTTON') {
-        if (k === 'Enter' || k === ' ') { e.preventDefault(); closeSheet(); render(); }
+        if (k === 'Enter' || k === ' ') { e.preventDefault(); startFlow(); }
         else if (k === 's' || k === 'S') showSettings();
         else if (k === 'h' || k === 'H') showSessions();
         else if (k === 'a' || k === 'A') showAbout();
@@ -880,14 +1183,12 @@
       else if (status === 'idle' || status === 'running') onTap();
     } else if (k === 'p' || k === 'P') {
       if (status === 'running') pauseNow(); else if (status === 'paused') resume();
+    } else if ((k === 'e' || k === 'E') && status === 'running') {
+      pauseNow();                 // mid-question: pause first, then E again finishes
     } else if ((k === 'e' || k === 'E') && status === 'paused') {
       finish();
     } else if ((k === 'r' || k === 'R') && status === 'paused') {
-      if (resetKeyTimer) { clearTimeout(resetKeyTimer); resetKeyTimer = null; resetAll(); }
-      else {
-        elHint.textContent = 'Press R again to reset';
-        resetKeyTimer = setTimeout(function () { resetKeyTimer = null; render(); }, 2000);
-      }
+      tapReset();
     } else if ((k === 'm' || k === 'M') && status === 'idle') {
       showMenu();
     } else if ((k === 's' || k === 'S') && status === 'idle') {
@@ -900,6 +1201,8 @@
   });
 
   document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') saveLive();
+    if (document.visibilityState === 'hidden' && press) { var hp = press; press = null; clearHold(); if (hp.ring && !hp.fired) render(); }
     if (document.visibilityState === 'visible' && status === 'running') { tick(); keepAwake(); }
   });
 
@@ -946,7 +1249,7 @@
   setupPWA();
 
   render();
-  showMenu();
+  if (validLive(liveFound)) showRestore(liveFound); else { liveFound = null; showMenu(); }
 })();
 </script>
 </body>
